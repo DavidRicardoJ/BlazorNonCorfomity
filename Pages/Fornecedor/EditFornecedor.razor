@@ -1,0 +1,140 @@
+﻿@page "/editFornecedor/{idFornecedor:int}"
+@using System.Text.Json
+@using BlazorNonConformity.Data.Interfaces
+@using BlazorNonCorfomity.Models.ValidationsModels
+@using FluentValidation
+
+@inject IJSRuntime js
+@inject IFornecedorRepository repository
+@inject NavigationManager navigation
+@inject IDialogService DialogService
+
+
+
+
+<MudContainer Style="margin: 40px; max-width: 70%">
+    <MudCard Elevation="10" Square>
+        <MudCardHeader Style="justify-content: center;"><MudText Typo="Typo.h4" Color="Color.Primary">Editar Fornecedor</MudText></MudCardHeader>
+        <MudCardContent>
+            <EditForm Model="model" OnValidSubmit="UpdateFornecedor">
+
+                <FluentValidationValidator />
+
+                <div>
+                    <MudTextField @ref="input1" AutoFocus="true" T="int" @bind-Value="@model.IdFornecedor" OnKeyDown="(KeyboardEventArgs e) => NextInputOnEnter(1, e)"
+                                  Label="Código MV" autocomplete="off"></MudTextField>
+                    <ValidationMessage style="color: orangered" For="(() => model.IdFornecedor)" />
+                </div>
+
+                <div>
+                    <MudTextField @ref="input2" T="string" @bind-Value="model.RazaoSocial" autocomplete="off" OnKeyDown="(KeyboardEventArgs e) => NextInputOnEnter(2, e)" Label="Razão Social"></MudTextField>
+                    <ValidationMessage style="color: orangered" For="(()=> model.RazaoSocial)" />
+                </div>
+
+                <div>
+                    <MudTextField @ref="input3" T="string" @bind-Value="model.NomeFantasia" autocomplete="off" OnKeyDown="(KeyboardEventArgs e) => NextInputOnEnter(3, e)" Label="Nome Fantasia"></MudTextField>
+                    <ValidationMessage style="color: orangered" For="(()=> model.NomeFantasia)" />
+                </div>
+
+                <div>
+                    <MudTextField @ref="input4" id="cnpj" T="string" MaxLength="18" @bind-Value="model.CNPJ" OnKeyDown="FormataCNPJ" autocomplete="off" Label="CNPJ"></MudTextField>
+                    <ValidationMessage style="color: orangered" For="(()=> model.CNPJ)" />
+                </div>
+
+                <MudCardActions>
+                    <div class="col-12 form-group" style="margin-top: 40px;">
+
+                        <MudButton Variant="Variant.Filled" Size="Size.Large" OnClick="Cancelar" Color="Color.Primary">Cancelar</MudButton>
+
+                        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Size="Size.Large"
+                                   Color="Color.Success">Atualizar Fornecedor</MudButton>
+                    </div>
+                </MudCardActions>
+            </EditForm>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+<Dialog></Dialog>
+
+@code {
+    
+    public Fornecedor? model { get; set; } = new();
+
+    [Parameter]
+    public int idFornecedor { get; set; }
+
+    MudTextField<int>? input1;
+    MudTextField<string>? input2;
+    MudTextField<string>? input3;
+    MudTextField<string>? input4;
+
+
+
+    private async void FormataCNPJ()
+    {
+        await js.InvokeVoidAsync("MascaraCnpj");
+    }
+
+    protected async override Task OnParametersSetAsync()
+    {
+        var fornecedor = await repository.GetFornecedorById(idFornecedor);
+        if (fornecedor is null)
+        {
+            navigation.NavigateTo("/indexfornecedores");
+
+        }
+        else
+        {
+            model = fornecedor;
+        }
+
+    }
+
+    private void Cancelar()
+    {        
+        navigation.NavigateTo("/", forceLoad: true);
+    }
+
+    private async void UpdateFornecedor()
+    {
+        var result = await repository.UpdateFornecedor(model);
+        if (result > 0)
+        {
+            if (await OpenDialog("Update Realizado com Sucesso!"))
+            {
+                navigation.NavigateTo("/indexfornecedores");
+            }
+        }
+        else
+        {
+            OpenDialog("A Atualização Falhou!");
+        }
+    }
+
+    private async Task<bool> OpenDialog(string message)
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true };
+        var dialog = DialogService.Show<Dialog>(message, options);
+        var result = await dialog.Result;
+        return !result.Cancelled;
+    }
+
+    private async void NextInputOnEnter(int posicaoInput, KeyboardEventArgs args)
+    {
+        if (args.Key != "Enter") return;
+
+        switch (posicaoInput)
+        {
+            case 1:
+                await input2.FocusAsync();
+                break;
+            case 2:
+                await input3.FocusAsync();
+                break;
+            case 3:
+                await input4.FocusAsync();
+                break;
+        }
+    }
+}

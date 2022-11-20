@@ -1,0 +1,133 @@
+﻿@using BlazorNonConformity.Data.Interfaces
+@using System.Text.Json
+
+@inject IDialogService DialogService
+@inject NavigationManager navigation
+@inject IFornecedorRepository _repository
+
+<MudPaper Elevation="10">
+    <MudButton Variant="Variant.Filled" Style="margin: 20px 0 0 20px;" Size="Size.Large" Color="Color.Success" OnClick="AdicionarFornecedor">Criar Novo</MudButton>
+    <MudText Align="Align.Center" Color="Color.Secondary" Typo="Typo.h3">Fornecedores</MudText>
+    <MudDivider Style="margin: 0 20px 50px 20px;"></MudDivider>
+
+    <MudTable Items="@Elements" Dense="@dense" Hover="@hover" Bordered="@bordered" FixedHeader="true" Style="margin: 20px;"
+              Striped="@striped" Filter="new Func<Fornecedor,bool>(FilterFunc1)" @bind-SelectedItem="selectedItem1" Virtualize="true">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">Fornecedores</MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="searchString1" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Cód.MV</MudTh>
+            <MudTh>CNPJ</MudTh>
+            <MudTh>Razão Social</MudTh>
+            <MudTh>Nome Fantasia</MudTh>
+            <MudTh>Opções</MudTh>
+
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="IdFornecedor">@context.IdFornecedor</MudTd>
+            <MudTd DataLabel="CNPJ">@context.CNPJ</MudTd>
+            <MudTd DataLabel="RazaoSocial">@context.RazaoSocial</MudTd>
+            <MudTd DataLabel="NomeFantasia">@context.NomeFantasia</MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                               Title="Editar"
+                               aria-label="edit"
+                               OnClick="() => EditFornecedor(context.IdFornecedor)"
+                               Color="Color.Primary">
+                </MudIconButton>
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Title="Excluir" aria-label="delete"
+                               OnClick="() =>ConfirmDelete(context.RazaoSocial, context.IdFornecedor)" Color="Color.Error"></MudIconButton>
+            </MudTd>
+
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+
+</MudPaper>
+
+<div class="d-flex flex-wrap mt-4">
+    <MudSwitch @bind-Checked="@hover" Color="Color.Primary">Hover</MudSwitch>
+    <MudSwitch @bind-Checked="@dense" Color="Color.Secondary">Dense</MudSwitch>
+    <MudSwitch @bind-Checked="@striped" Color="Color.Tertiary">Striped</MudSwitch>
+    <MudSwitch @bind-Checked="@bordered" Color="Color.Warning">Bordered</MudSwitch>
+    <MudSpacer />
+    <div style="min-width:200px;">
+        <MudText Inline="true" Class="align-self-center">Selected1: @selectedItem1?.RazaoSocial</MudText>
+    </div>
+</div>
+
+@code {
+    private bool dense = false;
+    private bool hover = true;
+    private bool striped = false;
+    private bool bordered = false;
+    private string searchString1 = "";
+    private Fornecedor? selectedItem1 = null;
+    private HashSet<Fornecedor> selectedItems = new HashSet<Fornecedor>();
+
+    private IEnumerable<Fornecedor> Elements = new List<Fornecedor>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Elements = await _repository.GetAll();
+    }
+
+    private bool FilterFunc1(Fornecedor element) => FilterFunc(element, searchString1);
+
+    private bool FilterFunc(Fornecedor element, string searchString)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        if (element.IdFornecedor.ToString().Equals(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (element.RazaoSocial.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (element.NomeFantasia.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    }
+
+    private void EditFornecedor(int idFornecedor)
+    {
+
+        if (idFornecedor != 0) navigation.NavigateTo($"/editFornecedor/{idFornecedor}");
+    }
+
+    private async void ConfirmDelete(string razaoSocial, int idFornecedor)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("ContentText", $"Confirma a exclusão do fornecedor: \n{razaoSocial}?");
+        parameters.Add("ButtonText", "Excluir");
+        parameters.Add("Color", Color.Error);
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        var dialog = DialogService.Show<DialogDelete>("Delete", parameters, options);
+        var result = await dialog.Result;
+        if (result.Cancelled is false) ExcluirFornecedor(idFornecedor);
+    }
+
+    private async void ExcluirFornecedor(int idFornecedor)
+    {
+        var result = await _repository.DeleteFornecedor(idFornecedor);
+        var message = "O registro não pode ser excluido, já há movimentações para o item. ";
+        if (result == -1)
+        {
+            var options = new DialogOptions { CloseOnEscapeKey = true };
+            var dialog = DialogService.Show<Dialog>(message, options);
+            await dialog.Result;
+
+        }
+        navigation.NavigateTo("/indexfornecedores", forceLoad: true);
+    }
+
+    private void AdicionarFornecedor()
+    {
+        navigation.NavigateTo("/createfornecedor");
+    }
+}
